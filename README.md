@@ -16,7 +16,13 @@ A personal blog website built **from scratch** using **Flask**, **Python**, **Bo
 - 👤 **Gravatar integration** for user profile images
 - 📱 **Responsive design** using Bootstrap 5
 - 🔒 **Admin-only routes** protected via decorators
-- 📧 **Resilient contact form** with SMTP email sending (timeout-safe)
+- 📧 **Resilient contact form** using Formspree API to bypass cloud-provider SMTP port restrictions.
+  - Smooth scroll to the header after a successful submission
+  - Hides the form and shows a success message dynamically
+  - Works reliably with Formspree
+- 🛠️ **Tech Highlight**: AJAX form submission with fetch API for smooth UX
+
+
 
 ---
 
@@ -83,6 +89,13 @@ Result:
 ✅ Contact page stays responsive  
 ✅ No more 502 errors  
 ✅ Email failures don’t take down the app
+
+### Latest Update: Contact Form UX Enhancement
+
+- Page now **smoothly scrolls to the header** after successful form submission
+- The form is **hidden** and a **success alert** is displayed dynamically
+- Improves user experience, especially on longer pages
+
 
 ---
 
