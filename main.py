@@ -301,10 +301,9 @@ def contact():
     return render_template("contact.html", msg_sent=False, current_user=current_user)
 
 
-# Email sending function
-# Email sending function (Render-safe, minimal fix)
+# Email sending function (Render-safe, Port 465 SSL Fix)
 def send_email(name, email, phone, message):
-    # Pull env vars INSIDE the function (critical for Render)
+    # Pull env vars INSIDE the function
     mail_address = os.environ.get("EMAIL_KEY")
     mail_app_pw = os.environ.get("PASSWORD_KEY")
 
@@ -317,9 +316,10 @@ def send_email(name, email, phone, message):
     )
 
     try:
-        # Gmail SMTP over TLS with timeout to prevent 502
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as connection:
-            connection.starttls()
+        # CHANGE: Use SMTP_SSL on port 465 instead of SMTP on 587
+        # This bypasses the [Errno 101] Network is unreachable error
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as connection:
+            # Note: starttls() is NOT needed for SMTP_SSL
             connection.login(mail_address, mail_app_pw)
             connection.sendmail(mail_address, mail_address, email_message)
     except Exception as e:
@@ -332,4 +332,3 @@ if __name__ == "__main__":
 
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
