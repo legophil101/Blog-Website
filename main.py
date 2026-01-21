@@ -282,9 +282,9 @@ def about():
 # DON'T put your email and password here directly! The code will be visible when you upload to Github.
 # Use environment variables instead (Day 35)
 
-# Email environment variables
-MAIL_ADDRESS = os.environ.get("EMAIL_KEY")
-MAIL_APP_PW = os.environ.get("PASSWORD_KEY")
+# # Email environment variables
+# MAIL_ADDRESS = os.environ.get("EMAIL_KEY")
+# MAIL_APP_PW = os.environ.get("PASSWORD_KEY")
 
 
 @app.route("/contact", methods=["GET", "POST"])
@@ -302,7 +302,12 @@ def contact():
 
 
 # Email sending function
+# Email sending function (Render-safe, minimal fix)
 def send_email(name, email, phone, message):
+    # Pull env vars INSIDE the function (critical for Render)
+    mail_address = os.environ.get("EMAIL_KEY")
+    mail_app_pw = os.environ.get("PASSWORD_KEY")
+
     email_message = (
         f"Subject: New Message\n\n"
         f"Name: {name}\n"
@@ -310,16 +315,21 @@ def send_email(name, email, phone, message):
         f"Phone: {phone}\n"
         f"Message: {message}"
     )
+
     try:
-        # Gmail SMTP over TLS
-        with smtplib.SMTP("smtp.gmail.com", 587) as connection:
+        # Gmail SMTP over TLS with timeout to prevent 502
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as connection:
             connection.starttls()
-            connection.login(MAIL_ADDRESS, MAIL_APP_PW)
-            connection.sendmail(MAIL_ADDRESS, MAIL_ADDRESS, email_message)
+            connection.login(mail_address, mail_app_pw)
+            connection.sendmail(mail_address, mail_address, email_message)
     except Exception as e:
-        # Log the error and continue so the site doesn't hang.
+        # Log error, DO NOT crash the request
         app.logger.error(f"Email send failed: {e}")
 
 
 if __name__ == "__main__":
-    app.run(debug=False)
+    import os
+
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
+
