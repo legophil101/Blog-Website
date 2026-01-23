@@ -104,8 +104,8 @@ Result:
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/legophil101/Blog-Website.git
-cd Blog-Website
+git clone https://github.com/legophil101/blog-website.git
+cd blog-website
 ```
 
 ### 2. Create a .env file
