@@ -92,25 +92,50 @@ After deploying on Render, we encountered production-specific challenges that di
 * On free-tier Render instances, the combination of a "cold-start" and the initial **Supabase** database handshake often takes ~35–40 seconds.
 * Gunicorn assumed the app was frozen and killed the process right before it could finish initializing.
 
-### **Fixes Implemented**
-1. **Increased Gunicorn Timeout & Worker Optimization**
-   * Command: `gunicorn -w 1 --threads 2 -t 180 main:app`
-   * *Result:* Increased the timeout to 180 seconds to allow for slow cold-starts and database handshakes.
-   * *Memory Optimization:* Limited the app to **one worker** (`-w 1`) with **two threads** (`--threads 2`). This prevents the app from spawning multiple "clones" that exceed Render's 512MB RAM limit, stopping the `SIGKILL` loop during traffic spikes.
-2. **Verified Database URL Protocol**
-   * Ensured `DATABASE_URL` uses the `postgresql://` prefix (required by SQLAlchemy 2.0+).
-3. **Added Heartbeat Route (`/ping`)**
-   * A lightweight route that returns a simple status without querying the database.
-   * Allows **UptimeRobot** to keep the service awake without triggering heavy DB hits.
-4. **Cascade Delete Logic**
-   * Modified the `BlogPost` model to handle relational cleanup:
-     ```python
-     comments = relationship("Comment", back_populates="parent_post", cascade="all, delete")
-     ```
-   * Prevents `IntegrityError` when deleting posts and ensures database integrity.
-5. **Database Connection Pooling**
-   * Added `pool_pre_ping: True` and `pool_recycle: 300` to the SQLAlchemy engine options.
-   * *Result:* Banished the `PendingRollbackError` by ensuring the app checks if a database connection is still alive before using it, silently reconnecting if Supabase has timed out.
+### 🛠️ Fixes Implemented
+
+#### **Gunicorn & Worker Optimization**
+
+* **Command:** `gunicorn -w 2 --threads 2 --timeout 90 main:app`
+* **Concurrency:** Increased to **two workers** to prevent "single-worker deadlock." This ensures that if one worker is waiting on a database response from Mumbai, the second worker can still serve requests to other users.
+* **Memory Management:** Balanced at 2 workers to stay comfortably within Render’s **512MB RAM limit**, effectively stopping the `SIGKILL` loops caused by memory exhaustion.
+
+#### **Advanced Database Connection Pooling**
+
+* **Configuration:**
+```python
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "pool_pre_ping": True,
+    "pool_recycle": 300,
+    "pool_size": 10,
+    "max_overflow": 20,
+}
+
+```
+
+* **Result:** Banished the `PendingRollbackError` and `OperationalError`. The **pool_pre_ping** ensures the app "tests" the connection before every query, silently reconnecting if the Singapore-to-Mumbai pipe has timed out.
+
+#### **Optimized Startup Logic**
+
+* **Strategy:** Commented out `db.create_all()` inside the `app_context`.
+* **Result:** Drastically reduced startup time and prevented Render's "Health Check" from failing. Since tables are already persistent in Supabase, this prevents redundant, slow handshakes on every deploy.
+
+#### **Verified Database URL Protocol**
+
+* **Fix:** Ensured `DATABASE_URL` uses the `postgresql://` prefix instead of the deprecated `postgres://`.
+* **Requirement:** Critical for compatibility with **SQLAlchemy 2.0+** and modern Psycopg2 drivers.
+
+#### **Heartbeat Route (`/ping`)**
+
+* **Feature:** A lightweight route that returns a `200 OK` status without querying the database.
+* **Integration:** Designed for **UptimeRobot** to keep the service "warm," preventing the 15-minute idle sleep on Render's Free Tier without adding load to the database.
+
+#### **Cascade Delete Logic**
+
+* **Model Update:** `comments = relationship("Comment", back_populates="parent_post", cascade="all, delete")`
+* **Result:** Prevents `IntegrityError` when deleting blog posts by automatically cleaning up associated comments, ensuring database referential integrity.
+
+---
 
 ### **Current Status**
 * ✅ App boots reliably on Render free-tier.
