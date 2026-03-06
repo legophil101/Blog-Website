@@ -5,7 +5,7 @@ from flask_ckeditor import CKEditor
 from flask_gravatar import Gravatar
 from flask_login import UserMixin, login_user, LoginManager, current_user, logout_user
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import relationship, DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import relationship, DeclarativeBase, Mapped, mapped_column, joinedload
 from sqlalchemy import Integer, String, Text, text
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -70,7 +70,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True,
     "pool_recycle": 300,  # Keep connections alive for 5 minutes
-    "pool_size": 10,      # Give your workers more "slots" to talk to the DB
+    "pool_size": 10,  # Give your workers more "slots" to talk to the DB
     "max_overflow": 20,
 }
 
@@ -219,10 +219,24 @@ def logout():
     return redirect(url_for('get_all_posts'))
 
 
+# @app.route('/')
+# def get_all_posts():
+#     result = db.session.execute(db.select(BlogPost))
+#     posts = result.scalars().all()
+#     return render_template("index.html", all_posts=posts, current_user=current_user)
+
+
 @app.route('/')
 def get_all_posts():
-    result = db.session.execute(db.select(BlogPost))
-    posts = result.scalars().all()
+    # Fetch posts, authors, and comments in ONE single database trip
+    result = db.session.execute(
+        db.select(BlogPost)
+        .options(joinedload(BlogPost.author))
+        .order_by(BlogPost.id.desc())
+        .limit(5)  # Start with 5 to make the load feel instantaneous
+    )
+    # .unique() is required when using joinedload to avoid duplicate post objects
+    posts = result.scalars().unique().all()
     return render_template("index.html", all_posts=posts, current_user=current_user)
 
 

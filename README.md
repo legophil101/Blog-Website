@@ -96,9 +96,11 @@ After deploying on Render, we encountered production-specific challenges that di
 
 #### **Gunicorn & Worker Optimization**
 
-* **Command:** `gunicorn -w 2 --threads 2 --timeout 90 main:app`
-* **Concurrency:** Increased to **two workers** to prevent "single-worker deadlock." This ensures that if one worker is waiting on a database response from Mumbai, the second worker can still serve requests to other users.
-* **Memory Management:** Balanced at 2 workers to stay comfortably within Render’s **512MB RAM limit**, effectively stopping the `SIGKILL` loops caused by memory exhaustion.
+* **Database Eager Loading (`joinedload`):** Optimized the homepage query to eliminate the "N+1 Problem." By using SQLAlchemy's `joinedload`, the app now fetches posts, authors, and metadata in **one single database trip** instead of 19+, significantly reducing cross-region latency between Singapore (Render) and Mumbai (Supabase).
+* **Gunicorn Configuration:** * **Command:** `gunicorn -w 1 --threads 4 --timeout 120 main:app`
+    * **Stability over Concurrency:** Tuned to a single worker with multiple threads to maximize available RAM (512MB limit) and prevent **Error 520/SIGKILL** crashes. 
+    * **Latency Handling:** Increased threads allow the server to handle secondary tasks while waiting for long-distance database responses.
+* **Payload Reduction:** Implemented a `.limit(5)` constraint on the initial homepage load to reduce data transfer size and improve "Time to First Byte" (TTFB) on throttled free-tier connections.
 
 #### **Advanced Database Connection Pooling**
 
